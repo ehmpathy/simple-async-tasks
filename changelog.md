@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/ehmpathy/simple-async-tasks/compare/v1.1.0...v1.1.1) (2023-07-16)
+
+
+### Bug Fixes
+
+* **pkg:** make type-fns a peer dep ([b417a50](https://github.com/ehmpathy/simple-async-tasks/commit/b417a5074fa5454b5c81461e466e5b0d5bda1f23))
+
 ## [1.1.0](https://github.com/ehmpathy/simple-async-tasks/compare/v1.0.0...v1.1.0) (2023-07-16)
 
 
