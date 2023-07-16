@@ -2,7 +2,7 @@
   "name": "simple-async-tasks",
   "author": "ehmpathy",
   "description": "A simple in-memory queue, for nodejs and the browser, with consumers for common usecases.",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "repository": "ehmpathy/simple-async-tasks",
   "homepage": "https://github.com/ehmpathy/simple-async-tasks",
   "keywords": [
