@@ -1,4 +1,6 @@
+import { BadRequestError, HelpfulError } from '@ehmpathy/error-fns';
 import { addMinutes, isBefore, parseISO } from 'date-fns';
+import type { LogMethods } from 'simple-leveled-log-methods';
 import { HasMetadata } from 'type-fns';
 
 import {
@@ -6,7 +8,15 @@ import {
   AsyncTaskDaoDatabaseConnection,
 } from '../domain/constants';
 import { AsyncTask, AsyncTaskStatus } from '../domain/objects/AsyncTask';
-import { BadRequestError } from '../utils/BadRequestError';
+
+export class SimpleAsyncTaskRetryLaterError extends HelpfulError {
+  constructor(reason: string, metadata?: Record<string, any>) {
+    super(
+      `this error was thrown to ensure this task is retried later. ${reason}`,
+      metadata,
+    );
+  }
+}
 
 /**
  * enables creating an execute method that conforms to the pit-of-success execution-lifecycle of a task
@@ -15,8 +25,8 @@ import { BadRequestError } from '../utils/BadRequestError';
  * 1. looks up the latest state of the task from the db by unique, throws BadRequestError if not findable
  * 2. checks that task is attemptable, throws BadRequestError if not
  *     - if task has `status.ATTEMPTED` for less than 15 min, then throw RetryLaterError as it my still be executing
- *     - if task has `status.FULFILLED`, then throw BadRequestError so that the request wont be retired by sqs
- *     - if task has `status.CANCELED`, then throw BadRequestError so that the request wont be retried by sqs
+ *     - if task has `status.FULFILLED`, then simply return it, to prevent repeated execution
+ *     - if task has `status.CANCELED`, then simply return it, to prevent repeated execution
  * 3. marks the task as `status.ATTEMPTED` to signify that it is being attempted now
  * 4. runs the logic to execute the task
  * 5. checks that the status of the task was changed to something other than `status.ATTEMPTED` while executing the task
@@ -38,11 +48,13 @@ export const withAsyncTaskExecutionLifecycleExecute = <
   logic: (args: P & { task: HasMetadata<T> }) => R | Promise<R>,
   {
     dao,
+    log,
   }: {
     dao: AsyncTaskDao<T, U, D>;
+    log: LogMethods;
   },
-) => {
-  return async (args: P) => {
+): ((args: P) => Promise<(R & { task: T }) | { task: T }>) => {
+  return async (args: P): Promise<(R & { task: T }) | { task: T }> => {
     // try to find the task by unique; it must be defined in db by now
     const foundTask = await dao.findByUnique({
       ...(args.task as any as U),
@@ -62,20 +74,26 @@ export const withAsyncTaskExecutionLifecycleExecute = <
       );
       const now = new Date();
       if (isBefore(now, fifteenMinutesAfterUpdatedAt))
-        throw new BadRequestError(
-          'will not attempt to execute task: it is already being attempted.',
+        throw new SimpleAsyncTaskRetryLaterError(
+          'this task may still be being attempted by a different invocation, last attempt started less than 15 minutes ago',
         );
     }
 
-    // check that the task has not already been fulfilled and is not canceled; bad-request because we dont want to try this again automatically
-    if (foundTask.status === AsyncTaskStatus.FULFILLED)
-      throw new BadRequestError(
-        'will not attempt to execute task: it has already succeeded.',
+    // check that the task has not already been fulfilled and is not canceled; if either are true, warn and exit
+    if (foundTask.status === AsyncTaskStatus.FULFILLED) {
+      log.warn(
+        'attempted to execute a task that has already been fulfilled. skipping',
+        { task: foundTask },
       );
-    if (foundTask.status === AsyncTaskStatus.CANCELED)
-      throw new BadRequestError(
-        'will not attempt to execute task: it has been canceled.',
+      return { task: foundTask };
+    }
+    if (foundTask.status === AsyncTaskStatus.CANCELED) {
+      log.warn(
+        'attempted to execute a task that has already been canceled. skipping',
+        { task: foundTask },
       );
+      return { task: foundTask };
+    }
 
     // record that we are now attempting this task
     const attemptedTask = await dao.upsert({
