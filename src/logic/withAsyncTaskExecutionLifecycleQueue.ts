@@ -37,12 +37,19 @@ export const withAsyncTaskExecutionLifecycleQueue = <
   getNew,
   dao,
   log,
+  sqs,
   queue,
 }: {
   getNew: (args: P) => T | Promise<T>;
   dao: AsyncTaskDao<T, U, D>;
   log: LogMethods;
-  queue: { push: (task: T) => Promise<void> | void };
+  sqs: {
+    sendMessage: (input: {
+      queueUrl: string;
+      messageBody: string;
+    }) => Promise<void>;
+  };
+  queue: { url: string };
 }) => {
   return async (args: P): Promise<HasMetadata<T>> => {
     // try to find the task by unique
@@ -97,7 +104,10 @@ export const withAsyncTaskExecutionLifecycleQueue = <
       ...taskReadyToQueue,
       status: AsyncTaskStatus.QUEUED,
     };
-    await queue.push(taskToQueue);
+    await sqs.sendMessage({
+      queueUrl: queue.url,
+      messageBody: JSON.stringify({ task: taskToQueue }),
+    });
 
     // and save that it has been queued
     return await dao.upsert({

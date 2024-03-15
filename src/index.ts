@@ -1,3 +1,4 @@
+export { extractTaskFromSqsEvent } from './logic/extractTaskFromSqsEvent';
 export { withAsyncTaskExecutionLifecycleQueue } from './logic/withAsyncTaskExecutionLifecycleQueue';
 export { withAsyncTaskExecutionLifecycleExecute } from './logic/withAsyncTaskExecutionLifecycleExecute';
 
