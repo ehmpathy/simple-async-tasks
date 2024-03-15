@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/ehmpathy/simple-async-tasks/compare/v1.1.1...v1.2.0) (2024-03-15)
+
+
+### Features
+
+* **observability:** add logs. only warn on redundant attempts ([#7](https://github.com/ehmpathy/simple-async-tasks/issues/7)) ([45f74c6](https://github.com/ehmpathy/simple-async-tasks/commit/45f74c69f9cdfd7bbee09a0c14173edfd8f0b9db))
+
 ## [1.1.1](https://github.com/ehmpathy/simple-async-tasks/compare/v1.1.0...v1.1.1) (2023-07-16)
 
 
