@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/ehmpathy/simple-async-tasks/compare/v1.2.0...v1.3.0) (2024-03-15)
+
+
+### Features
+
+* **extract:** simplify extracting tasks from sqs events ([75a6891](https://github.com/ehmpathy/simple-async-tasks/commit/75a6891dc8cd794908ed3dd36b6f046f41a340ea))
+
 ## [1.2.0](https://github.com/ehmpathy/simple-async-tasks/compare/v1.1.1...v1.2.0) (2024-03-15)
 
 
