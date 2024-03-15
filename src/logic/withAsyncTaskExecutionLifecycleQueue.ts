@@ -1,3 +1,4 @@
+import type { LogMethods } from 'simple-leveled-log-methods';
 import { HasMetadata } from 'type-fns';
 
 import {
@@ -35,10 +36,12 @@ export const withAsyncTaskExecutionLifecycleQueue = <
 >({
   getNew,
   dao,
+  log,
   queue,
 }: {
   getNew: (args: P) => T | Promise<T>;
   dao: AsyncTaskDao<T, U, D>;
+  log: LogMethods;
   queue: { push: (task: T) => Promise<void> | void };
 }) => {
   return async (args: P): Promise<HasMetadata<T>> => {
@@ -49,10 +52,42 @@ export const withAsyncTaskExecutionLifecycleQueue = <
     });
 
     // if the task already exists, check that its in a queueable state
-    if (taskFound?.status === AsyncTaskStatus.QUEUED) return taskFound; // if already queued, no need to duplicate the request
-    if (taskFound?.status === AsyncTaskStatus.ATTEMPTED) return taskFound; // if already being attempted, no need to duplicate the request
-    if (taskFound?.status === AsyncTaskStatus.FULFILLED) return taskFound; // if already fulfilled, no sense in trying it again
-    if (taskFound?.status === AsyncTaskStatus.CANCELED) return taskFound; // if was canceled, no sense in queuing something that is no longer desired
+    if (taskFound?.status === AsyncTaskStatus.QUEUED) {
+      log.debug(
+        'skipped adding task to queue. reason: task is already queued',
+        {
+          task: taskFound,
+        },
+      );
+      return taskFound; // if already queued, no need to duplicate the request
+    }
+    if (taskFound?.status === AsyncTaskStatus.ATTEMPTED) {
+      log.debug(
+        'skipped adding task to queue. reason: task is already being attempted from queue',
+        {
+          task: taskFound,
+        },
+      );
+      return taskFound; // if already being attempted, no need to duplicate the request
+    }
+    if (taskFound?.status === AsyncTaskStatus.FULFILLED) {
+      log.debug(
+        'skipped adding task to queue. reason: task was already fulfilled',
+        {
+          task: taskFound,
+        },
+      );
+      return taskFound; // if already fulfilled, no sense in trying it again
+    }
+    if (taskFound?.status === AsyncTaskStatus.CANCELED) {
+      log.debug(
+        'skipped adding task to queue. reason: task was already canceled',
+        {
+          task: taskFound,
+        },
+      );
+      return taskFound; // if was canceled, no sense in queuing something that is no longer desired
+    }
 
     // if the task does not exist, create the task with the new initial state
     const taskReadyToQueue = taskFound ?? (await getNew(args)); // note: we dont save to the database yet to prevent duplicate calls but also because if this is called within a transaction, the effective_at time is the same for the initial version and the queued version, leading to duplicate-key violations on the version table
