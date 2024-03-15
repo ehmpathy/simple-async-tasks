@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/ehmpathy/simple-async-tasks/compare/v1.3.0...v1.3.1) (2024-03-15)
+
+
+### Bug Fixes
+
+* **queue:** allow queue url defined via async fn ([c8ecfe1](https://github.com/ehmpathy/simple-async-tasks/commit/c8ecfe1e2c2e703a78550f81b25b86a8f6507a78))
+
 ## [1.3.0](https://github.com/ehmpathy/simple-async-tasks/compare/v1.2.0...v1.3.0) (2024-03-15)
 
 
