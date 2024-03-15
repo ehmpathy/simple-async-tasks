@@ -11,3 +11,4 @@ ignores:
   - date-fns
   - husky
   - if-env
+  - aws-lambda

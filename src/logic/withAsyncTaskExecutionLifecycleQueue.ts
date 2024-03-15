@@ -1,5 +1,5 @@
 import type { LogMethods } from 'simple-leveled-log-methods';
-import { HasMetadata } from 'type-fns';
+import { HasMetadata, isAFunction } from 'type-fns';
 
 import {
   AsyncTaskDao,
@@ -49,7 +49,7 @@ export const withAsyncTaskExecutionLifecycleQueue = <
       messageBody: string;
     }) => Promise<void>;
   };
-  queue: { url: string };
+  queue: { url: string | (() => Promise<string>) };
 }) => {
   return async (args: P): Promise<HasMetadata<T>> => {
     // try to find the task by unique
@@ -104,8 +104,11 @@ export const withAsyncTaskExecutionLifecycleQueue = <
       ...taskReadyToQueue,
       status: AsyncTaskStatus.QUEUED,
     };
+    log.debug('adding task to queue', {
+      task: taskToQueue,
+    });
     await sqs.sendMessage({
-      queueUrl: queue.url,
+      queueUrl: isAFunction(queue.url) ? await queue.url() : queue.url,
       messageBody: JSON.stringify({ task: taskToQueue }),
     });
 
