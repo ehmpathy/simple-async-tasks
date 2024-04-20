@@ -1,5 +1,9 @@
 export { extractTaskFromSqsEvent } from './logic/extractTaskFromSqsEvent';
-export { withAsyncTaskExecutionLifecycleQueue } from './logic/withAsyncTaskExecutionLifecycleQueue';
+export {
+  withAsyncTaskExecutionLifecycleEnqueue,
+  SimpleAsyncTaskSqsQueueContract,
+  SimpleAsyncTaskAnyQueueContract,
+} from './logic/withAsyncTaskExecutionLifecycleEnqueue';
 export { withAsyncTaskExecutionLifecycleExecute } from './logic/withAsyncTaskExecutionLifecycleExecute';
 
 export { AsyncTask, AsyncTaskStatus } from './domain/objects/AsyncTask';

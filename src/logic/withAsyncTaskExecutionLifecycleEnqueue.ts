@@ -1,3 +1,4 @@
+import { UnexpectedCodePathError } from '@ehmpathy/error-fns';
 import type { LogMethods } from 'simple-leveled-log-methods';
 import { HasMetadata, isAFunction } from 'type-fns';
 
@@ -6,6 +7,35 @@ import {
   AsyncTaskDaoDatabaseConnection,
 } from '../domain/constants';
 import { AsyncTask, AsyncTaskStatus } from '../domain/objects/AsyncTask';
+
+/**
+ * a simple, pit-of-success, contract for async-tasks queued via sqs
+ *
+ * benefits
+ * - guarantees a standard message body
+ * - guarantees a simple definition of the minimum inputs required
+ */
+export type SimpleAsyncTaskSqsQueueContract = {
+  type: 'SQS';
+  api: {
+    sendMessage: (input: {
+      queueUrl: string;
+      messageBody: string;
+    }) => Promise<void>;
+  };
+  url: string | (() => Promise<string>);
+};
+
+/**
+ * a simple, generic, contract for async-tasks queued via any queue
+ *
+ * benefits
+ * - enables interoperability with custom queue mechanisms not already supported
+ */
+export type SimpleAsyncTaskAnyQueueContract<T> = {
+  type?: 'ANY';
+  push: ((task: T) => void) | ((task: T) => Promise<void>);
+};
 
 /**
  * enables creating an `queue` method that conforms to the pit-of-success execution-lifecycle of a task
@@ -25,10 +55,8 @@ import { AsyncTask, AsyncTaskStatus } from '../domain/objects/AsyncTask';
  *    2. queues the task
  *       1. writes to the sqs queue
  *       2. updates the status of the task to `status.QUEUED`
- *
- * note: this wrapper uses BadRequestError specifically to make sure that the lambda invocation is not recorded as an error and that the request is not retried automatically
  */
-export const withAsyncTaskExecutionLifecycleQueue = <
+export const withAsyncTaskExecutionLifecycleEnqueue = <
   T extends AsyncTask,
   U extends Partial<T>,
   D extends AsyncTaskDaoDatabaseConnection | undefined,
@@ -37,19 +65,12 @@ export const withAsyncTaskExecutionLifecycleQueue = <
   getNew,
   dao,
   log,
-  sqs,
   queue,
 }: {
   getNew: (args: P) => T | Promise<T>;
   dao: AsyncTaskDao<T, U, D>;
   log: LogMethods;
-  sqs: {
-    sendMessage: (input: {
-      queueUrl: string;
-      messageBody: string;
-    }) => Promise<void>;
-  };
-  queue: { url: string | (() => Promise<string>) };
+  queue: SimpleAsyncTaskSqsQueueContract | SimpleAsyncTaskAnyQueueContract<T>;
 }) => {
   return async (args: P): Promise<HasMetadata<T>> => {
     // try to find the task by unique
@@ -107,10 +128,24 @@ export const withAsyncTaskExecutionLifecycleQueue = <
     log.debug('adding task to queue', {
       task: taskToQueue,
     });
-    await sqs.sendMessage({
-      queueUrl: isAFunction(queue.url) ? await queue.url() : queue.url,
-      messageBody: JSON.stringify({ task: taskToQueue }),
-    });
+
+    await (async () => {
+      // support sqs queues natively
+      if (queue.type === 'SQS')
+        return await queue.api.sendMessage({
+          queueUrl: isAFunction(queue.url) ? await queue.url() : queue.url,
+          messageBody: JSON.stringify({ task: taskToQueue }),
+        });
+
+      // otherwise, assume it has a generic queue contract
+      if (queue.push) return await queue.push(taskToQueue);
+
+      // otherwise, this is not a supported queue mechanism
+      throw new UnexpectedCodePathError(
+        'unsupported queue mechanism specified',
+        { queue },
+      );
+    })();
 
     // and save that it has been queued
     return await dao.upsert({
