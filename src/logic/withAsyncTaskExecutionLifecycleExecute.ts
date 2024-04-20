@@ -1,5 +1,5 @@
 import { BadRequestError, HelpfulError } from '@ehmpathy/error-fns';
-import { addMinutes, isBefore, parseISO } from 'date-fns';
+import { addMinutes, addSeconds, isBefore, parseISO } from 'date-fns';
 import type { LogMethods } from 'simple-leveled-log-methods';
 import { HasMetadata } from 'type-fns';
 
@@ -49,9 +49,20 @@ export const withAsyncTaskExecutionLifecycleExecute = <
   {
     dao,
     log,
+    options,
   }: {
     dao: AsyncTaskDao<T, U, D>;
     log: LogMethods;
+    options?: {
+      attempt?: {
+        /**
+         * how long to wait before retrying an attempted task
+         *
+         * default = 15 minutes
+         */
+        timeout: { seconds: number };
+      };
+    };
   },
 ): ((args: P) => Promise<(R & { task: T }) | { task: T }>) => {
   return async (args: P): Promise<(R & { task: T }) | { task: T }> => {
@@ -68,14 +79,20 @@ export const withAsyncTaskExecutionLifecycleExecute = <
     // check that the task is not already being attempted
     if (foundTask.status === AsyncTaskStatus.ATTEMPTED) {
       // if the task was updated less than 15 minutes ago, then it may still be being attempted, so throw an error so this message will get retried eventually
-      const fifteenMinutesAfterUpdatedAt = addMinutes(
+      const attemptTimeoutSeconds =
+        options?.attempt?.timeout.seconds ?? 15 * 60;
+      const attemptTimeoutAt = addSeconds(
         parseISO(foundTask.updatedAt!),
-        15,
+        attemptTimeoutSeconds, // default to 15 min
       );
       const now = new Date();
-      if (isBefore(now, fifteenMinutesAfterUpdatedAt))
+      if (isBefore(now, attemptTimeoutAt))
         throw new SimpleAsyncTaskRetryLaterError(
-          'this task may still be being attempted by a different invocation, last attempt started less than 15 minutes ago',
+          'this task may still be being attempted by a different invocation, last attempt started less than the timeout',
+          {
+            attemptTimeoutSeconds,
+            attemptTimeoutAt,
+          },
         );
     }
 
