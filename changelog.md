@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.2](https://github.com/ehmpathy/simple-async-tasks/compare/v1.3.1...v1.3.2) (2024-04-20)
+
+
+### Bug Fixes
+
+* **enqueue:** re-enable enqueue to any queue, beyond sqs ([495141c](https://github.com/ehmpathy/simple-async-tasks/commit/495141c8218b616ff81b4b02c6073aa37eb7fbab))
+* **execute:** enable custom attempt timeout in seconds ([af67c8c](https://github.com/ehmpathy/simple-async-tasks/commit/af67c8c628939e429394357ee0940b7536bb2e1e))
+
 ## [1.3.1](https://github.com/ehmpathy/simple-async-tasks/compare/v1.3.0...v1.3.1) (2024-03-15)
 
 
