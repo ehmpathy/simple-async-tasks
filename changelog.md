@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.4](https://github.com/ehmpathy/simple-async-tasks/compare/v1.3.3...v1.3.4) (2024-05-14)
+
+
+### Bug Fixes
+
+* **deps:** unpin typefns peer dep with new v sempher range ([#14](https://github.com/ehmpathy/simple-async-tasks/issues/14)) ([87af9f8](https://github.com/ehmpathy/simple-async-tasks/commit/87af9f87c4da750202967fc0af6082cd110fe84e))
+
 ## [1.3.3](https://github.com/ehmpathy/simple-async-tasks/compare/v1.3.2...v1.3.3) (2024-05-14)
 
 
