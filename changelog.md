@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.3](https://github.com/ehmpathy/simple-async-tasks/compare/v1.3.2...v1.3.3) (2024-05-14)
+
+
+### Bug Fixes
+
+* **deps:** unpin typefns peer dependency ([#12](https://github.com/ehmpathy/simple-async-tasks/issues/12)) ([acbdece](https://github.com/ehmpathy/simple-async-tasks/commit/acbdece8db49d1e68f7992368215073b88829c6b))
+
 ## [1.3.2](https://github.com/ehmpathy/simple-async-tasks/compare/v1.3.1...v1.3.2) (2024-04-20)
 
 
