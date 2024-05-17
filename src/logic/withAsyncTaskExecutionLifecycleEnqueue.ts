@@ -2,10 +2,7 @@ import { UnexpectedCodePathError } from '@ehmpathy/error-fns';
 import type { LogMethods } from 'simple-leveled-log-methods';
 import { HasMetadata, isAFunction } from 'type-fns';
 
-import {
-  AsyncTaskDao,
-  AsyncTaskDaoDatabaseConnection,
-} from '../domain/constants';
+import { AsyncTaskDao, AsyncTaskDaoContext } from '../domain/constants';
 import { AsyncTask, AsyncTaskStatus } from '../domain/objects/AsyncTask';
 
 /**
@@ -59,25 +56,26 @@ export type SimpleAsyncTaskAnyQueueContract<T> = {
 export const withAsyncTaskExecutionLifecycleEnqueue = <
   T extends AsyncTask,
   U extends Partial<T>,
-  D extends AsyncTaskDaoDatabaseConnection | undefined,
-  P extends { dbConnection?: D } & U,
+  C extends AsyncTaskDaoContext,
 >({
   getNew,
   dao,
   log,
   queue,
 }: {
-  getNew: (args: P) => T | Promise<T>;
-  dao: AsyncTaskDao<T, U, D>;
+  getNew: (input: U, context: C) => T | Promise<T>;
+  dao: AsyncTaskDao<T, U, C>;
   log: LogMethods;
   queue: SimpleAsyncTaskSqsQueueContract | SimpleAsyncTaskAnyQueueContract<T>;
 }) => {
-  return async (args: P): Promise<HasMetadata<T>> => {
+  return async (input: U, context: C): Promise<HasMetadata<T>> => {
     // try to find the task by unique
-    const taskFound = await dao.findByUnique({
-      ...args,
-      dbConnection: args.dbConnection,
-    });
+    const taskFound = await dao.findByUnique(
+      {
+        ...input,
+      },
+      context,
+    );
 
     // if the task already exists, check that its in a queueable state
     if (taskFound?.status === AsyncTaskStatus.QUEUED) {
@@ -118,7 +116,7 @@ export const withAsyncTaskExecutionLifecycleEnqueue = <
     }
 
     // if the task does not exist, create the task with the new initial state
-    const taskReadyToQueue = taskFound ?? (await getNew(args)); // note: we dont save to the database yet to prevent duplicate calls but also because if this is called within a transaction, the effective_at time is the same for the initial version and the queued version, leading to duplicate-key violations on the version table
+    const taskReadyToQueue = taskFound ?? (await getNew(input, context)); // note: we dont save to the database yet to prevent duplicate calls but also because if this is called within a transaction, the effective_at time is the same for the initial version and the queued version, leading to duplicate-key violations on the version table
 
     // now queue the task into sqs
     const taskToQueue = {
@@ -148,9 +146,11 @@ export const withAsyncTaskExecutionLifecycleEnqueue = <
     })();
 
     // and save that it has been queued
-    return await dao.upsert({
-      dbConnection: args.dbConnection,
-      task: taskToQueue,
-    });
+    return await dao.upsert(
+      {
+        task: taskToQueue,
+      },
+      context,
+    );
   };
 };

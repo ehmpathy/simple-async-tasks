@@ -1,12 +1,9 @@
 import { BadRequestError, HelpfulError } from '@ehmpathy/error-fns';
-import { addMinutes, addSeconds, isBefore, parseISO } from 'date-fns';
+import { addSeconds, isBefore, parseISO } from 'date-fns';
 import type { LogMethods } from 'simple-leveled-log-methods';
 import { HasMetadata } from 'type-fns';
 
-import {
-  AsyncTaskDao,
-  AsyncTaskDaoDatabaseConnection,
-} from '../domain/constants';
+import { AsyncTaskDao, AsyncTaskDaoContext } from '../domain/constants';
 import { AsyncTask, AsyncTaskStatus } from '../domain/objects/AsyncTask';
 
 export class SimpleAsyncTaskRetryLaterError extends HelpfulError {
@@ -38,20 +35,19 @@ export class SimpleAsyncTaskRetryLaterError extends HelpfulError {
 export const withAsyncTaskExecutionLifecycleExecute = <
   T extends AsyncTask,
   U extends Partial<T>,
-  D extends AsyncTaskDaoDatabaseConnection | undefined,
-  P extends {
-    dbConnection?: D;
+  I extends {
     task: T;
   },
-  R extends Record<string, any>,
+  C extends AsyncTaskDaoContext,
+  O extends Record<string, any>,
 >(
-  logic: (args: P & { task: HasMetadata<T> }) => R | Promise<R>,
+  logic: (input: I & { task: HasMetadata<T> }, context: C) => O | Promise<O>,
   {
     dao,
     log,
     options,
   }: {
-    dao: AsyncTaskDao<T, U, D>;
+    dao: AsyncTaskDao<T, U, C>;
     log: LogMethods;
     options?: {
       attempt?: {
@@ -64,16 +60,21 @@ export const withAsyncTaskExecutionLifecycleExecute = <
       };
     };
   },
-): ((args: P) => Promise<(R & { task: T }) | { task: T }>) => {
-  return async (args: P): Promise<(R & { task: T }) | { task: T }> => {
+): ((input: I, context: C) => Promise<(O & { task: T }) | { task: T }>) => {
+  return async (
+    input: I,
+    context: C,
+  ): Promise<(O & { task: T }) | { task: T }> => {
     // try to find the task by unique; it must be defined in db by now
-    const foundTask = await dao.findByUnique({
-      ...(args.task as any as U),
-      dbConnection: args.dbConnection,
-    });
+    const foundTask = await dao.findByUnique(
+      {
+        ...(input.task as unknown as U),
+      },
+      context,
+    );
     if (!foundTask)
       throw new BadRequestError(
-        `task not found by unique: '${JSON.stringify(args.task)}'`,
+        `task not found by unique: '${JSON.stringify(input.task)}'`,
       );
 
     // check that the task is not already being attempted
@@ -113,20 +114,24 @@ export const withAsyncTaskExecutionLifecycleExecute = <
     }
 
     // record that we are now attempting this task
-    const attemptedTask = await dao.upsert({
-      dbConnection: args.dbConnection,
-      task: { ...foundTask, status: AsyncTaskStatus.ATTEMPTED },
-    });
+    const attemptedTask = await dao.upsert(
+      {
+        task: { ...foundTask, status: AsyncTaskStatus.ATTEMPTED },
+      },
+      context,
+    );
 
     // try and run the logic with db connection in a txn
     try {
-      const result = await logic({ ...args, task: attemptedTask }); // execute the task
+      const result = await logic({ ...input, task: attemptedTask }, context); // execute the task
 
       // if the status of the task was not changed from attempted, then throw an error; its the obligation of the execute function to specify what status the task is in now
-      const taskNow = await dao.findByUnique({
-        ...(args.task as any as U),
-        dbConnection: args.dbConnection,
-      });
+      const taskNow = await dao.findByUnique(
+        {
+          ...(input.task as any as U),
+        },
+        context,
+      );
       if (!taskNow)
         throw new Error(
           'task can no longer be found by unique. this should not be possible',
@@ -139,10 +144,12 @@ export const withAsyncTaskExecutionLifecycleExecute = <
       // otherwise, just return the result with the state of the task now, since this is probably a multi-step task
       return { ...result, task: taskNow };
     } catch (error) {
-      await dao.upsert({
-        dbConnection: args.dbConnection,
-        task: { ...attemptedTask, status: AsyncTaskStatus.FAILED },
-      }); // record that it failed
+      await dao.upsert(
+        {
+          task: { ...attemptedTask, status: AsyncTaskStatus.FAILED },
+        },
+        context,
+      ); // record that it failed
       throw error; // and pass the error back up
     }
   };

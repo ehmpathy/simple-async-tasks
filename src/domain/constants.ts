@@ -2,7 +2,7 @@ import { HasMetadata } from 'type-fns';
 
 import { AsyncTask } from './objects/AsyncTask';
 
-export type AsyncTaskDaoDatabaseConnection = Record<string, any>;
+export type AsyncTaskDaoContext = Record<string, any> | void;
 
 /**
  * a dao that can be used to persist the async-task
@@ -14,12 +14,8 @@ export type AsyncTaskDaoDatabaseConnection = Record<string, any>;
 export interface AsyncTaskDao<
   T extends AsyncTask,
   U extends Partial<T>,
-  D extends AsyncTaskDaoDatabaseConnection | undefined,
+  C extends AsyncTaskDaoContext,
 > {
-  findByUnique: (
-    args: U & {
-      dbConnection?: D;
-    },
-  ) => Promise<HasMetadata<T> | null>;
-  upsert: (args: { task: T; dbConnection?: D }) => Promise<HasMetadata<T>>;
+  findByUnique: (input: U, context: C) => Promise<HasMetadata<T> | null>;
+  upsert: (input: { task: T }, context: C) => Promise<HasMetadata<T>>;
 }
