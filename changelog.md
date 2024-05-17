@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.5](https://github.com/ehmpathy/simple-async-tasks/compare/v1.3.4...v1.3.5) (2024-05-17)
+
+
+### Bug Fixes
+
+* **types:** support procedure.input,.context args pattern ([0204a8b](https://github.com/ehmpathy/simple-async-tasks/commit/0204a8bd926203155c9838e4672dd3357d79a847))
+
 ## [1.3.4](https://github.com/ehmpathy/simple-async-tasks/compare/v1.3.3...v1.3.4) (2024-05-14)
 
 
