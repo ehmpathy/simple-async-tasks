@@ -56,6 +56,7 @@ export type SimpleAsyncTaskAnyQueueContract<T> = {
 export const withAsyncTaskExecutionLifecycleEnqueue = <
   T extends AsyncTask,
   U extends Partial<T>,
+  M extends Partial<T>,
   C extends AsyncTaskDaoContext,
 >({
   getNew,
@@ -64,7 +65,7 @@ export const withAsyncTaskExecutionLifecycleEnqueue = <
   queue,
 }: {
   getNew: (input: U, context: C) => T | Promise<T>;
-  dao: AsyncTaskDao<T, U, C>;
+  dao: AsyncTaskDao<T, U, M, C>;
   log: LogMethods;
   queue: SimpleAsyncTaskSqsQueueContract | SimpleAsyncTaskAnyQueueContract<T>;
 }) => {

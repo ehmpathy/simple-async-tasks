@@ -1,6 +1,6 @@
 import { HasMetadata } from 'type-fns';
 
-import { AsyncTask } from './objects/AsyncTask';
+import { AsyncTask, AsyncTaskStatus } from './objects/AsyncTask';
 
 export type AsyncTaskDaoContext = Record<string, any> | void;
 
@@ -14,8 +14,13 @@ export type AsyncTaskDaoContext = Record<string, any> | void;
 export interface AsyncTaskDao<
   T extends AsyncTask,
   U extends Partial<T>,
+  M extends Partial<T>,
   C extends AsyncTaskDaoContext,
 > {
+  findByMutex?: (
+    input: M & { status: AsyncTaskStatus.ATTEMPTED }, // needs to be able to search by mutex keys + status
+    context: C,
+  ) => Promise<HasMetadata<T>[]>;
   findByUnique: (input: U, context: C) => Promise<HasMetadata<T> | null>;
   upsert: (input: { task: T }, context: C) => Promise<HasMetadata<T>>;
 }
