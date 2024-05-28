@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/ehmpathy/simple-async-tasks/compare/v1.3.5...v1.4.0) (2024-05-28)
+
+
+### Features
+
+* **mutex:** support mutex lock retries via dobj class statics ([23b923e](https://github.com/ehmpathy/simple-async-tasks/commit/23b923e92d563d44a504631dd73a245aceb72a48))
+
 ## [1.3.5](https://github.com/ehmpathy/simple-async-tasks/compare/v1.3.4...v1.3.5) (2024-05-17)
 
 
