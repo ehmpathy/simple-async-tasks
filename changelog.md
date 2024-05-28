@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/ehmpathy/simple-async-tasks/compare/v1.4.0...v1.4.1) (2024-05-28)
+
+
+### Bug Fixes
+
+* **deps:** remove unused dep ([87b6db1](https://github.com/ehmpathy/simple-async-tasks/commit/87b6db16a339fed6128af39139e1f561ddebb358))
+
 ## [1.4.0](https://github.com/ehmpathy/simple-async-tasks/compare/v1.3.5...v1.4.0) (2024-05-28)
 
 
