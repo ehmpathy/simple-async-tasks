@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.2](https://github.com/ehmpathy/simple-async-tasks/compare/v1.4.1...v1.4.2) (2024-06-07)
+
+
+### Bug Fixes
+
+* **dobj:** support updatedAt as Date or iso String ([1bd381d](https://github.com/ehmpathy/simple-async-tasks/commit/1bd381d1babf898f8381b9fc45dcdd85018d2838))
+
 ## [1.4.1](https://github.com/ehmpathy/simple-async-tasks/compare/v1.4.0...v1.4.1) (2024-05-28)
 
 
