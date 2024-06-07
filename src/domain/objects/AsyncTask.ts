@@ -53,6 +53,6 @@ export enum AsyncTaskStatus {
  */
 export interface AsyncTask {
   uuid?: string;
-  updatedAt?: string;
+  updatedAt?: string | Date;
   status: AsyncTaskStatus;
 }

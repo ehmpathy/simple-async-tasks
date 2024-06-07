@@ -92,8 +92,17 @@ export const withAsyncTaskExecutionLifecycleExecute = <
       // if the task was updated less than 15 minutes ago, then it may still be being attempted, so throw an error so this message will get retried eventually
       const attemptTimeoutSeconds =
         options?.attempt?.timeout.seconds ?? 15 * 60;
+      const updatedAtLast =
+        typeof foundTask.updatedAt === 'string'
+          ? parseISO(foundTask.updatedAt)
+          : foundTask.updatedAt;
+      if (!updatedAtLast)
+        throw new UnexpectedCodePathError(
+          'task did not have an .updatedAt attribute. this is required for reliable async-tasks',
+          { foundTask },
+        );
       const attemptTimeoutAt = addSeconds(
-        parseISO(foundTask.updatedAt!),
+        updatedAtLast,
         attemptTimeoutSeconds, // default to 15 min
       );
       const now = new Date();
