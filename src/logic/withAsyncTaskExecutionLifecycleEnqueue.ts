@@ -58,18 +58,19 @@ export const withAsyncTaskExecutionLifecycleEnqueue = <
   U extends Partial<T>,
   M extends Partial<T>,
   C extends AsyncTaskDaoContext,
+  I extends U,
 >({
   getNew,
   dao,
   log,
   queue,
 }: {
-  getNew: (input: U, context: C) => T | Promise<T>;
+  getNew: (input: I, context: C) => T | Promise<T>;
   dao: AsyncTaskDao<T, U, M, C>;
   log: LogMethods;
   queue: SimpleAsyncTaskSqsQueueContract | SimpleAsyncTaskAnyQueueContract<T>;
 }) => {
-  return async (input: U, context: C): Promise<HasMetadata<T>> => {
+  return async (input: I, context: C): Promise<HasMetadata<T>> => {
     // try to find the task by unique
     const taskFound = await dao.findByUnique(
       {
