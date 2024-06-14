@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.3](https://github.com/ehmpathy/simple-async-tasks/compare/v1.4.2...v1.4.3) (2024-06-14)
+
+
+### Bug Fixes
+
+* **enqueue:** support input type which extends unique key ([816f060](https://github.com/ehmpathy/simple-async-tasks/commit/816f06025aa9cdf42d13bcbad04381e4186cdcd6))
+
 ## [1.4.2](https://github.com/ehmpathy/simple-async-tasks/compare/v1.4.1...v1.4.2) (2024-06-07)
 
 
