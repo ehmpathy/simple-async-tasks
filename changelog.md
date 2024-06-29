@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.4](https://github.com/ehmpathy/simple-async-tasks/compare/v1.4.3...v1.4.4) (2024-06-29)
+
+
+### Bug Fixes
+
+* **logs:** improve log observability ([48a6bbc](https://github.com/ehmpathy/simple-async-tasks/commit/48a6bbcd6913b80310bc2ff34e300422bd3efb5c))
+
 ## [1.4.3](https://github.com/ehmpathy/simple-async-tasks/compare/v1.4.2...v1.4.3) (2024-06-14)
 
 
