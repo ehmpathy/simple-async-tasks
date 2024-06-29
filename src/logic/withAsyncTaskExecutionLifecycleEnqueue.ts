@@ -82,7 +82,7 @@ export const withAsyncTaskExecutionLifecycleEnqueue = <
     // if the task already exists, check that its in a queueable state
     if (taskFound?.status === AsyncTaskStatus.QUEUED) {
       log.debug(
-        'skipped adding task to queue. reason: task is already queued',
+        'enqueueTask.progress: skipped adding task to queue. reason: task is already queued',
         {
           task: taskFound,
         },
@@ -91,7 +91,7 @@ export const withAsyncTaskExecutionLifecycleEnqueue = <
     }
     if (taskFound?.status === AsyncTaskStatus.ATTEMPTED) {
       log.debug(
-        'skipped adding task to queue. reason: task is already being attempted from queue',
+        'enqueueTask.progress: skipped adding task to queue. reason: task is already being attempted from queue',
         {
           task: taskFound,
         },
@@ -100,7 +100,7 @@ export const withAsyncTaskExecutionLifecycleEnqueue = <
     }
     if (taskFound?.status === AsyncTaskStatus.FULFILLED) {
       log.debug(
-        'skipped adding task to queue. reason: task was already fulfilled',
+        'enqueueTask.progress: skipped adding task to queue. reason: task was already fulfilled',
         {
           task: taskFound,
         },
@@ -109,7 +109,7 @@ export const withAsyncTaskExecutionLifecycleEnqueue = <
     }
     if (taskFound?.status === AsyncTaskStatus.CANCELED) {
       log.debug(
-        'skipped adding task to queue. reason: task was already canceled',
+        'enqueueTask.progress: skipped adding task to queue. reason: task was already canceled',
         {
           task: taskFound,
         },
@@ -125,10 +125,10 @@ export const withAsyncTaskExecutionLifecycleEnqueue = <
       ...taskReadyToQueue,
       status: AsyncTaskStatus.QUEUED,
     };
-    log.debug('adding task to queue', {
+    log.debug('enqueueTask.progress: adding task to queue', {
       task: taskToQueue,
+      queue: { type: queue.type },
     });
-
     await (async () => {
       // support sqs queues natively
       if (queue.type === 'SQS')
@@ -146,6 +146,10 @@ export const withAsyncTaskExecutionLifecycleEnqueue = <
         { queue },
       );
     })();
+    log.debug('enqueueTask.progress: added task to queue', {
+      task: taskToQueue,
+      queue: { type: queue.type },
+    });
 
     // and save that it has been queued
     return await dao.upsert(

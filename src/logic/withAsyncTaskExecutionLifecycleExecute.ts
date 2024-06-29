@@ -119,14 +119,14 @@ export const withAsyncTaskExecutionLifecycleExecute = <
     // check that the task has not already been fulfilled and is not canceled; if either are true, warn and exit
     if (foundTask.status === AsyncTaskStatus.FULFILLED) {
       log.warn(
-        'attempted to execute a task that has already been fulfilled. skipping',
+        'executeTask.progress: attempted to execute a task that has already been fulfilled. skipping',
         { task: foundTask },
       );
       return { task: foundTask };
     }
     if (foundTask.status === AsyncTaskStatus.CANCELED) {
       log.warn(
-        'attempted to execute a task that has already been canceled. skipping',
+        'executeTask.progress: attempted to execute a task that has already been canceled. skipping',
         { task: foundTask },
       );
       return { task: foundTask };
