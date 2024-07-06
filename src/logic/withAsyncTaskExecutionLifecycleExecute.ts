@@ -3,12 +3,17 @@ import {
   HelpfulError,
   UnexpectedCodePathError,
 } from '@ehmpathy/error-fns';
+import { HelpfulErrorMetadata } from '@ehmpathy/error-fns/dist/HelpfulError';
 import { addSeconds, isBefore, parseISO } from 'date-fns';
 import type { LogMethods } from 'simple-leveled-log-methods';
-import { HasMetadata } from 'type-fns';
 
-import { AsyncTaskDao, AsyncTaskDaoContext } from '../domain/constants';
+import {
+  AsyncTaskDao,
+  AsyncTaskDaoContext,
+  SimpleAwsSqsApi,
+} from '../domain/constants';
 import { AsyncTask, AsyncTaskStatus } from '../domain/objects/AsyncTask';
+import { AsyncTaskQueueParcel } from './extractTaskParcelFromSqsEvent';
 
 export class SimpleAsyncTaskRetryLaterError extends HelpfulError {
   constructor(reason: string, metadata?: Record<string, any>) {
@@ -44,21 +49,23 @@ export class SimpleAsyncTaskRetryLaterError extends HelpfulError {
 export const withAsyncTaskExecutionLifecycleExecute = <
   T extends AsyncTask,
   U extends Partial<T>,
-  M extends Partial<T>,
-  I extends {
-    task: T;
-  },
+  M extends Partial<T> & { status: AsyncTaskStatus },
+  I extends AsyncTaskQueueParcel<T>,
   C extends AsyncTaskDaoContext,
   O extends Record<string, any>,
 >(
-  logic: (input: I & { task: HasMetadata<T> }, context: C) => O | Promise<O>,
+  logic: (input: I & AsyncTaskQueueParcel<T>, context: C) => O | Promise<O>,
   {
     dao,
     log,
+    api,
     options,
   }: {
     dao: AsyncTaskDao<T, U, M, C>;
     log: LogMethods;
+    api?: {
+      sqs?: SimpleAwsSqsApi;
+    };
     options?: {
       attempt?: {
         /**
@@ -70,11 +77,14 @@ export const withAsyncTaskExecutionLifecycleExecute = <
       };
     };
   },
-): ((input: I, context: C) => Promise<(O & { task: T }) | { task: T }>) => {
+): ((
+  input: I,
+  context: C,
+) => Promise<(O & { task: T }) | (Partial<O> & { task: T })>) => {
   return async (
     input: I,
     context: C,
-  ): Promise<(O & { task: T }) | { task: T }> => {
+  ): Promise<(O & { task: T }) | (Partial<O> & { task: T })> => {
     // try to find the task by unique; it must be defined in db by now
     const foundTask = await dao.findByUnique(
       {
@@ -87,11 +97,49 @@ export const withAsyncTaskExecutionLifecycleExecute = <
         `task not found by unique: '${JSON.stringify(input.task)}'`,
       );
 
+    // define the timeout in seconds; this is how long each attempt could take, max
+    const attemptTimeoutSeconds = options?.attempt?.timeout.seconds ?? 15 * 60; // default to 15min, a conservative estimate
+
+    // define how to retry later
+    const retryLater = (() => {
+      // if this is an sqs driven task and the meta is available, requeue and resolve success
+      if (input.meta?.queueType === 'SQS') {
+        const queueUrl = input.meta.queueUrl;
+        return async (message: string, metadata: HelpfulErrorMetadata) => {
+          // log what we're up to
+          log.debug(`executeTask.progress: requeueing task to retry later`, {
+            message,
+            metadata,
+          });
+
+          // get the sqs api
+          const sqs =
+            api?.sqs ??
+            UnexpectedCodePathError.throw(
+              'executeTask.api.sqs was not declared, yet task queue.type is sqs and found metadata',
+              {
+                meta: input.meta,
+                api,
+              },
+            );
+
+          // requeue the task
+          await sqs.sendMessage({
+            messageBody: JSON.stringify({ task: input.task, meta: input.meta }),
+            queueUrl,
+            delaySeconds: attemptTimeoutSeconds,
+          });
+        };
+      }
+
+      // otherwise, just throw the error; that's the base case
+      return async (message: string, metadata: HelpfulErrorMetadata) =>
+        SimpleAsyncTaskRetryLaterError.throw(message, metadata);
+    })();
+
     // check that the task is not already being attempted
     if (foundTask.status === AsyncTaskStatus.ATTEMPTED) {
       // if the task was updated less than 15 minutes ago, then it may still be being attempted, so throw an error so this message will get retried eventually
-      const attemptTimeoutSeconds =
-        options?.attempt?.timeout.seconds ?? 15 * 60;
       const updatedAtLast =
         typeof foundTask.updatedAt === 'string'
           ? parseISO(foundTask.updatedAt)
@@ -107,7 +155,7 @@ export const withAsyncTaskExecutionLifecycleExecute = <
       );
       const now = new Date();
       if (isBefore(now, attemptTimeoutAt))
-        throw new SimpleAsyncTaskRetryLaterError(
+        await retryLater(
           'this task may still be being attempted by a different invocation, last attempt started less than the timeout',
           {
             attemptTimeoutSeconds,
@@ -117,19 +165,20 @@ export const withAsyncTaskExecutionLifecycleExecute = <
     }
 
     // check that the task has not already been fulfilled and is not canceled; if either are true, warn and exit
+    const emptyResult: Partial<O> = {};
     if (foundTask.status === AsyncTaskStatus.FULFILLED) {
       log.warn(
         'executeTask.progress: attempted to execute a task that has already been fulfilled. skipping',
         { task: foundTask },
       );
-      return { task: foundTask };
+      return { ...emptyResult, task: foundTask };
     }
     if (foundTask.status === AsyncTaskStatus.CANCELED) {
       log.warn(
         'executeTask.progress: attempted to execute a task that has already been canceled. skipping',
         { task: foundTask },
       );
-      return { task: foundTask };
+      return { ...emptyResult, task: foundTask };
     }
 
     // determine whether we need to check for mutually exclusive tasks
@@ -148,7 +197,7 @@ export const withAsyncTaskExecutionLifecycleExecute = <
         context,
       );
       if (mutexActiveTasks.length)
-        throw new SimpleAsyncTaskRetryLaterError(
+        await retryLater(
           `this task's mutex lock is reserved by at least one other task currently being attempted by a different invocation`,
           {
             mutexKeys,

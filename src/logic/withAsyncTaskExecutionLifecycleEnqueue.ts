@@ -2,7 +2,12 @@ import { UnexpectedCodePathError } from '@ehmpathy/error-fns';
 import type { LogMethods } from 'simple-leveled-log-methods';
 import { HasMetadata, isAFunction } from 'type-fns';
 
-import { AsyncTaskDao, AsyncTaskDaoContext } from '../domain/constants';
+import { uuid } from '../deps';
+import {
+  AsyncTaskDao,
+  AsyncTaskDaoContext,
+  SimpleAwsSqsApi,
+} from '../domain/constants';
 import { AsyncTask, AsyncTaskStatus } from '../domain/objects/AsyncTask';
 
 /**
@@ -14,14 +19,48 @@ import { AsyncTask, AsyncTaskStatus } from '../domain/objects/AsyncTask';
  */
 export type SimpleAsyncTaskSqsQueueContract = {
   type: 'SQS';
-  api: {
-    sendMessage: (input: {
-      queueUrl: string;
-      messageBody: string;
-    }) => Promise<void>;
-  };
+  api: SimpleAwsSqsApi;
   url: string | (() => Promise<string>);
 };
+
+/**
+ * simple-async-task metadata embedded in the queue message
+ */
+export type SimpleAsyncTaskSqsEnqueueMetadata = {
+  /**
+   * the type of queue this task was enqueued to
+   *
+   * usecase
+   * - type narrow
+   */
+  queueType: 'SQS';
+
+  /**
+   * the queue that the message was originally enqueued to
+   */
+  queueUrl: string;
+
+  /**
+   * a uuid assigned to this message upon enqueue
+   *
+   * usecase
+   * - traceability
+   */
+  enqueueUuid: string;
+
+  /**
+   * the number of times this sqs.message was requeued, post enqueue
+   *
+   * usecase
+   * - infiniloop prevention
+   */
+  requeueDepth: number;
+};
+
+/**
+ * the different types of metadata that are available enqueue
+ */
+export type SimpleAsyncTaskEnqueueMetadata = SimpleAsyncTaskSqsEnqueueMetadata;
 
 /**
  * a simple, generic, contract for async-tasks queued via any queue
@@ -56,7 +95,7 @@ export type SimpleAsyncTaskAnyQueueContract<T> = {
 export const withAsyncTaskExecutionLifecycleEnqueue = <
   T extends AsyncTask,
   U extends Partial<T>,
-  M extends Partial<T>,
+  M extends Partial<T> & { status: AsyncTaskStatus },
   C extends AsyncTaskDaoContext,
   I extends U,
 >({
@@ -131,11 +170,22 @@ export const withAsyncTaskExecutionLifecycleEnqueue = <
     });
     await (async () => {
       // support sqs queues natively
-      if (queue.type === 'SQS')
+      if (queue.type === 'SQS') {
+        const queueUrl = isAFunction(queue.url) ? await queue.url() : queue.url;
+        const meta: SimpleAsyncTaskSqsEnqueueMetadata = {
+          queueType: 'SQS',
+          queueUrl,
+          enqueueUuid: uuid(),
+          requeueDepth: 0,
+        };
         return await queue.api.sendMessage({
-          queueUrl: isAFunction(queue.url) ? await queue.url() : queue.url,
-          messageBody: JSON.stringify({ task: taskToQueue }),
+          queueUrl,
+          messageBody: JSON.stringify({
+            task: taskToQueue,
+            meta,
+          }),
         });
+      }
 
       // otherwise, assume it has a generic queue contract
       if (queue.push) return await queue.push(taskToQueue);
