@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/ehmpathy/simple-async-tasks/compare/v1.4.4...v1.5.0) (2024-07-06)
+
+
+### Features
+
+* **requeue:** add native sqs requeue capability to prevent error logs on retryLater ([ca83c9b](https://github.com/ehmpathy/simple-async-tasks/commit/ca83c9bf167aa9177bcb3a7ecde0c4f6c1ee7e3e))
+
 ## [1.4.4](https://github.com/ehmpathy/simple-async-tasks/compare/v1.4.3...v1.4.4) (2024-06-29)
 
 
