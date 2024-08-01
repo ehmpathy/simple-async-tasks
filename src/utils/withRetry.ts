@@ -1,5 +1,5 @@
 import { UniDuration, sleep } from '@ehmpathy/uni-time';
-import { LogMethods } from 'simple-leveled-log-methods';
+import type { LogMethods } from 'simple-leveled-log-methods';
 
 /**
  * function which calls the wrapped function and runs it again one time if an error is caught
