@@ -1,8 +1,4 @@
-import {
-  BadRequestError,
-  HelpfulError,
-  UnexpectedCodePathError,
-} from '@ehmpathy/error-fns';
+import { HelpfulError, UnexpectedCodePathError } from '@ehmpathy/error-fns';
 import { HelpfulErrorMetadata } from '@ehmpathy/error-fns/dist/HelpfulError';
 import { addSeconds, isBefore, parseISO } from 'date-fns';
 import type { LogMethods } from 'simple-leveled-log-methods';
@@ -13,6 +9,7 @@ import {
   SimpleAwsSqsApi,
 } from '../domain/constants';
 import { AsyncTask, AsyncTaskStatus } from '../domain/objects/AsyncTask';
+import { withRetry } from '../utils/withRetry';
 import { AsyncTaskQueueParcel } from './extractTaskParcelFromSqsEvent';
 
 export class SimpleAsyncTaskRetryLaterError extends HelpfulError {
@@ -86,16 +83,31 @@ export const withAsyncTaskExecutionLifecycleExecute = <
     context: C,
   ): Promise<(O & { task: T }) | (Partial<O> & { task: T })> => {
     // try to find the task by unique; it must be defined in db by now
-    const foundTask = await dao.findByUnique(
-      {
-        ...(input.task as unknown as U),
+    const foundTask = await withRetry(
+      async () => {
+        // lookup the task
+        const foundTaskNow = await dao.findByUnique(
+          {
+            ...(input.task as unknown as U),
+          },
+          context,
+        );
+
+        // if not found, throw an error, as this shouldn't have been called for a non-existent task; => drive to dlq if irrecoverable
+        if (!foundTaskNow)
+          throw new UnexpectedCodePathError(`task not found by unique`, {
+            task: input.task,
+          });
+
+        // return the task
+        return foundTaskNow;
       },
-      context,
-    );
-    if (!foundTask)
-      throw new BadRequestError(
-        `task not found by unique: '${JSON.stringify(input.task)}'`,
-      );
+      {
+        // wait 3 seconds before retrying, to attempt to recover from read-after-write out-of-sync issues (e.g., if we tried to search for the task before the db.reader was synced to db.writer)
+        delay: { seconds: 3 },
+        log,
+      },
+    )();
 
     // define the timeout in seconds; this is how long each attempt could take, max
     const attemptTimeoutSeconds = options?.attempt?.timeout.seconds ?? 15 * 60; // default to 15min, a conservative estimate
@@ -237,6 +249,16 @@ export const withAsyncTaskExecutionLifecycleExecute = <
       // otherwise, just return the result with the state of the task now, since this is probably a multi-step task
       return { ...result, task: taskNow };
     } catch (error) {
+      log.warn(
+        'executeTask.progress: caught an error from the execution attempt. marking it as failed. will re-emit the error for sqs retry',
+        {
+          task: attemptedTask,
+          error: {
+            class: error instanceof Error ? error.name : undefined,
+            message: error instanceof Error ? error.message : undefined,
+          },
+        },
+      );
       await dao.upsert(
         {
           task: { ...attemptedTask, status: AsyncTaskStatus.FAILED },
