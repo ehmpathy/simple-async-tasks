@@ -1,3 +1,4 @@
+export { getSqsQueueUrlForTask as getQueueUrlForTask } from './logic/sqs/getSqsQueueUrlForTask';
 export { extractTaskParcelFromSqsEvent } from './logic/extractTaskParcelFromSqsEvent';
 export {
   withAsyncTaskExecutionLifecycleEnqueue,
