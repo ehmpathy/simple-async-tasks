@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/ehmpathy/simple-async-tasks/compare/v1.5.0...v1.6.0) (2024-08-01)
+
+
+### Features
+
+* **sqs:** distribute terraform queue module ([f33a02c](https://github.com/ehmpathy/simple-async-tasks/commit/f33a02c8e56ee6ca139287ffb1858cdb0659c13e))
+
 ## [1.5.0](https://github.com/ehmpathy/simple-async-tasks/compare/v1.4.4...v1.5.0) (2024-07-06)
 
 
