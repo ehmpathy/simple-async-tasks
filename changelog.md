@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.1](https://github.com/ehmpathy/simple-async-tasks/compare/v1.7.0...v1.7.1) (2024-08-01)
+
+
+### Bug Fixes
+
+* **exec:** auto-retry on unfound task for read-after-write resilience ([597b2b8](https://github.com/ehmpathy/simple-async-tasks/commit/597b2b8c6c80f2a4753d7a6d33307ebc83112015))
+* **practs:** bump practs to latest best ([05d6df8](https://github.com/ehmpathy/simple-async-tasks/commit/05d6df8648b6a2aa41c475e82a1e3d16a5bdb104))
+
 ## [1.7.0](https://github.com/ehmpathy/simple-async-tasks/compare/v1.6.0...v1.7.0) (2024-08-01)
 
 
