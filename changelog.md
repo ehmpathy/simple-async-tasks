@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/ehmpathy/simple-async-tasks/compare/v1.6.0...v1.7.0) (2024-08-01)
+
+
+### Features
+
+* **sqs:** expose utility to get sqs queue url from task name ([a9f2335](https://github.com/ehmpathy/simple-async-tasks/commit/a9f2335987e1d4a5fafff0c0aecefd74282946eb))
+
 ## [1.6.0](https://github.com/ehmpathy/simple-async-tasks/compare/v1.5.0...v1.6.0) (2024-08-01)
 
 
