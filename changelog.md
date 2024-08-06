@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.2](https://github.com/ehmpathy/simple-async-tasks/compare/v1.7.1...v1.7.2) (2024-08-06)
+
+
+### Bug Fixes
+
+* **retry:** ensure to exit without attempt on retry later via requeue ([653ec01](https://github.com/ehmpathy/simple-async-tasks/commit/653ec011c558fd8f6a1bd66d014f23901553e031))
+
 ## [1.7.1](https://github.com/ehmpathy/simple-async-tasks/compare/v1.7.0...v1.7.1) (2024-08-01)
 
 
