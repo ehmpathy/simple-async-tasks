@@ -141,6 +141,11 @@ export const withAsyncTaskExecutionLifecycleExecute = <
             queueUrl,
             delaySeconds: attemptTimeoutSeconds,
           });
+
+          // and return the retained state of the task
+          return {
+            task: foundTask,
+          } as any as Partial<O> & { task: T };
         };
       }
 
@@ -167,7 +172,7 @@ export const withAsyncTaskExecutionLifecycleExecute = <
       );
       const now = new Date();
       if (isBefore(now, attemptTimeoutAt))
-        await retryLater(
+        return await retryLater(
           'this task may still be being attempted by a different invocation, last attempt started less than the timeout',
           {
             attemptTimeoutSeconds,
@@ -209,7 +214,7 @@ export const withAsyncTaskExecutionLifecycleExecute = <
         context,
       );
       if (mutexActiveTasks.length)
-        await retryLater(
+        return await retryLater(
           `this task's mutex lock is reserved by at least one other task currently being attempted by a different invocation`,
           {
             mutexKeys,
