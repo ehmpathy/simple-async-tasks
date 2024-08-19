@@ -209,16 +209,37 @@ export const withAsyncTaskExecutionLifecycleExecute = <
         );
 
       // check whether there are mutually exclusive tasks in flight
-      const mutexActiveTasks = await dao.findByMutex(
+      const mutexTasks = await dao.findByMutex(
         { ...(foundTask as unknown as M), status: AsyncTaskStatus.ATTEMPTED },
         context,
       );
-      if (mutexActiveTasks.length)
+
+      // filter them down to the ones that are active (lambdas have durations w/ max of up to 15min)
+      const mutexTasksStillPotentiallyActive = mutexTasks.filter((task) => {
+        const updatedAtLast =
+          typeof task.updatedAt === 'string'
+            ? parseISO(task.updatedAt)
+            : task.updatedAt;
+        if (!updatedAtLast)
+          throw new UnexpectedCodePathError(
+            'task did not have an .updatedAt attribute. this is required for reliable async-tasks',
+            { mutexTaskFound: task },
+          );
+        const attemptTimeoutAt = addSeconds(
+          updatedAtLast,
+          attemptTimeoutSeconds, // default to 15 min
+        );
+        const now = new Date();
+        return isBefore(now, attemptTimeoutAt);
+      });
+
+      // retry the task if there are any
+      if (mutexTasksStillPotentiallyActive.length)
         return await retryLater(
           `this task's mutex lock is reserved by at least one other task currently being attempted by a different invocation`,
           {
             mutexKeys,
-            mutexActiveTasks,
+            mutexTasksStillPotentiallyActive,
           },
         );
     }

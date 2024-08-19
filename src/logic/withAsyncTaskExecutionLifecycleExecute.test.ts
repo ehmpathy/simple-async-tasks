@@ -1,3 +1,4 @@
+import { asUniDateTime, subDuration } from '@ehmpathy/uni-time';
 import { DomainEntity, getUniqueIdentifier, serialize } from 'domain-objects';
 import { getError, given, then, when } from 'test-fns';
 import { HasMetadata } from 'type-fns';
@@ -135,4 +136,160 @@ describe('withAsyncTaskExecutionLifecycleExecute', () => {
       },
     );
   });
+
+  given(
+    'a task class with an in memory dao, sqs driver, and mutex keys',
+    () => {
+      interface AsyncTaskSyncProspects {
+        updatedAt?: Date;
+        forAgentUuid: string;
+        perOpportunityUuid: string;
+        status: AsyncTaskStatus;
+      }
+      class AsyncTaskSyncProspects
+        extends DomainEntity<AsyncTaskSyncProspects>
+        implements AsyncTaskSyncProspects
+      {
+        public static unique = ['perOpportunityUuid'] as const;
+        public static mutex = ['forAgentUuid'] as const;
+      }
+      const database: Record<string, HasMetadata<AsyncTaskSyncProspects>> = {};
+      const daoAsyncTaskSyncProspects = {
+        upsert: jest.fn(
+          async (input: {
+            task: AsyncTaskSyncProspects;
+            mockUpdatedAt?: Date;
+          }): Promise<HasMetadata<AsyncTaskSyncProspects>> => {
+            const withMetadata = new AsyncTaskSyncProspects({
+              ...input.task,
+              updatedAt: input.mockUpdatedAt ?? new Date(),
+            }) as HasMetadata<AsyncTaskSyncProspects>;
+            database[serialize(getUniqueIdentifier(withMetadata))] =
+              withMetadata;
+            return withMetadata;
+          },
+        ),
+        findByUnique: jest.fn(
+          async (input: {
+            perOpportunityUuid: string;
+          }): Promise<null | HasMetadata<AsyncTaskSyncProspects>> =>
+            database[
+              serialize({ perOpportunityUuid: input.perOpportunityUuid })
+            ] ?? null,
+        ),
+        findByMutex: jest.fn(
+          async (input: { forAgentUuid: string; status: AsyncTaskStatus }) =>
+            Object.values(database).filter(
+              (task) =>
+                task.forAgentUuid === input.forAgentUuid &&
+                task.status === input.status,
+            ),
+        ),
+      };
+      const executeInnerLogicMock = jest.fn();
+      const sqsSendMessageMock = jest.fn();
+      const execute = withAsyncTaskExecutionLifecycleExecute(
+        async ({ task }) => {
+          executeInnerLogicMock({ on: task });
+          return {
+            task: await daoAsyncTaskSyncProspects.upsert({
+              task: { ...task, status: AsyncTaskStatus.FULFILLED },
+            }),
+          };
+        },
+        {
+          dao: daoAsyncTaskSyncProspects,
+          log: console,
+          api: {
+            sqs: {
+              sendMessage: sqsSendMessageMock,
+            },
+          },
+        },
+      );
+
+      beforeEach(() => {
+        executeInnerLogicMock.mockReset();
+        sqsSendMessageMock.mockReset();
+      });
+
+      when('asked to execute on a queued task', () => {
+        then('it should successfully attempt to execute', async () => {
+          const task = await daoAsyncTaskSyncProspects.upsert({
+            task: new AsyncTaskSyncProspects({
+              forAgentUuid: uuid(),
+              perOpportunityUuid: uuid(),
+              status: AsyncTaskStatus.QUEUED,
+            }),
+          });
+          const result = await execute({ task });
+          expect(executeInnerLogicMock).toHaveBeenCalledTimes(1);
+          expect(result.task.status).toEqual(AsyncTaskStatus.FULFILLED);
+        });
+      });
+
+      when(
+        'asked to execute on a queued task with an attempted mutex peer',
+        () => {
+          then(
+            'it should retry later since mutex is reserved by peer',
+            async () => {
+              const task = await daoAsyncTaskSyncProspects.upsert({
+                task: new AsyncTaskSyncProspects({
+                  forAgentUuid: uuid(),
+                  perOpportunityUuid: uuid(),
+                  status: AsyncTaskStatus.QUEUED,
+                }),
+              });
+              await daoAsyncTaskSyncProspects.upsert({
+                task: new AsyncTaskSyncProspects({
+                  forAgentUuid: task.forAgentUuid,
+                  perOpportunityUuid: uuid(),
+                  status: AsyncTaskStatus.ATTEMPTED, // in attempted status
+                }),
+              });
+
+              const error = await getError(execute({ task }));
+              expect(error.message).toContain(
+                'this error was thrown to ensure this task is retried later',
+              );
+              expect(error.message).toContain(
+                'mutex lock is reserved by at least one other task currently being attempted',
+              );
+            },
+          );
+        },
+      );
+
+      when(
+        'asked to execute on a queued task with an attempted mutex peer which was last updated over 17 min ago',
+        () => {
+          then('it should successfully attempt to execute', async () => {
+            const task = await daoAsyncTaskSyncProspects.upsert({
+              task: new AsyncTaskSyncProspects({
+                forAgentUuid: uuid(),
+                perOpportunityUuid: uuid(),
+                status: AsyncTaskStatus.QUEUED,
+              }),
+            });
+            await daoAsyncTaskSyncProspects.upsert({
+              task: new AsyncTaskSyncProspects({
+                forAgentUuid: task.forAgentUuid,
+                perOpportunityUuid: uuid(),
+                status: AsyncTaskStatus.ATTEMPTED, // in attempted status
+              }),
+              mockUpdatedAt: new Date(
+                subDuration(asUniDateTime(new Date()), {
+                  minutes: 17,
+                }),
+              ),
+            });
+            const result = await execute({ task });
+            expect(executeInnerLogicMock).toHaveBeenCalledTimes(1);
+            expect(result.task.status).toEqual(AsyncTaskStatus.FULFILLED);
+          });
+        },
+      );
+    },
+  );
 });
