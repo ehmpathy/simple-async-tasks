@@ -135,9 +135,24 @@ export const withAsyncTaskExecutionLifecycleExecute = <
               },
             );
 
+          // increment the requeue depth and prevent infiloops
+          const requeueDepthLimit = 3; // todo: pull from sqs subscription config
+          const requeueDepthAfter = (input.meta!.requeueDepth ?? 0) + 1;
+          if (requeueDepthAfter > requeueDepthLimit)
+            throw new UnexpectedCodePathError(
+              'attempted to retry a task more than limit times. blocked this attempt to prevent infiloop',
+              { requeueDepthLimit, requeueDepthAfter, input },
+            );
+
           // requeue the task
           await sqs.sendMessage({
-            messageBody: JSON.stringify({ task: input.task, meta: input.meta }),
+            messageBody: JSON.stringify({
+              task: input.task,
+              meta: {
+                ...input.meta,
+                requeueDepth: requeueDepthAfter,
+              },
+            }),
             queueUrl,
             delaySeconds: attemptTimeoutSeconds,
           });

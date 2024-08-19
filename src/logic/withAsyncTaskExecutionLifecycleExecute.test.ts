@@ -135,6 +135,38 @@ describe('withAsyncTaskExecutionLifecycleExecute', () => {
         );
       },
     );
+
+    when(
+      'asked to execute on a task which is already in ATTEMPTED mode, with sqs metadata, with input.meta.requeueDepth of 7',
+      () => {
+        const promiseTask = daoAsyncTaskEnrichProduct.upsert({
+          task: new AsyncTaskEnrichProduct({
+            productUuid: uuid(),
+            status: AsyncTaskStatus.ATTEMPTED,
+          }),
+        });
+
+        then(
+          'it should throw an error to prevent infiloop due to requeue depth',
+          async () => {
+            const error = await getError(
+              execute({
+                task: await promiseTask,
+                meta: {
+                  queueUrl: '__queue_url__',
+                  enqueueUuid: uuid(),
+                  queueType: 'SQS',
+                  requeueDepth: 7,
+                },
+              }),
+            );
+            expect(error.message).toContain(
+              'attempted to retry a task more than limit times. blocked this attempt to prevent infiloop',
+            );
+          },
+        );
+      },
+    );
   });
 
   given(
