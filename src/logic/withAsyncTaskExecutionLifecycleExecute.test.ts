@@ -5,7 +5,6 @@ import { HasMetadata } from 'type-fns';
 
 import { uuid } from '../deps';
 import { AsyncTaskStatus } from '../domain/objects/AsyncTask';
-import { withAsyncTaskExecutionLifecycleEnqueue } from './withAsyncTaskExecutionLifecycleEnqueue';
 import { withAsyncTaskExecutionLifecycleExecute } from './withAsyncTaskExecutionLifecycleExecute';
 
 describe('withAsyncTaskExecutionLifecycleExecute', () => {
@@ -55,7 +54,6 @@ describe('withAsyncTaskExecutionLifecycleExecute', () => {
       },
       {
         dao: daoAsyncTaskEnrichProduct,
-        log: console,
         api: {
           sqs: {
             sendMessage: sqsSendMessageMock,
@@ -78,7 +76,10 @@ describe('withAsyncTaskExecutionLifecycleExecute', () => {
       });
 
       then('it should successfully attempt to execute', async () => {
-        const result = await execute({ task: await promiseTask });
+        const result = await execute(
+          { task: await promiseTask },
+          { log: console },
+        );
         expect(executeInnerLogicMock).toHaveBeenCalledTimes(1);
         expect(result.task.status).toEqual(AsyncTaskStatus.FULFILLED);
       });
@@ -97,7 +98,9 @@ describe('withAsyncTaskExecutionLifecycleExecute', () => {
         then(
           'it should throw an error, to trigger a retry later, without invoking the inner execution logic',
           async () => {
-            const error = await getError(execute({ task: await promiseTask }));
+            const error = await getError(
+              execute({ task: await promiseTask }, { log: console }),
+            );
             expect(error.message).toContain(
               'this error was thrown to ensure this task is retried later',
             );
@@ -119,15 +122,18 @@ describe('withAsyncTaskExecutionLifecycleExecute', () => {
         then(
           'it should sqs.sendMessage on the task, to try again later, without invoking the inner execution logic',
           async () => {
-            const result = await execute({
-              task: await promiseTask,
-              meta: {
-                queueUrl: '__queue_url__',
-                enqueueUuid: uuid(),
-                queueType: 'SQS',
-                requeueDepth: 1,
+            const result = await execute(
+              {
+                task: await promiseTask,
+                meta: {
+                  queueUrl: '__queue_url__',
+                  enqueueUuid: uuid(),
+                  queueType: 'SQS',
+                  requeueDepth: 1,
+                },
               },
-            });
+              { log: console },
+            );
             console.log(result);
             expect(sqsSendMessageMock).toHaveBeenCalledTimes(1);
             expect(executeInnerLogicMock).toHaveBeenCalledTimes(0);
@@ -150,15 +156,18 @@ describe('withAsyncTaskExecutionLifecycleExecute', () => {
           'it should throw an error to prevent infiloop due to requeue depth',
           async () => {
             const error = await getError(
-              execute({
-                task: await promiseTask,
-                meta: {
-                  queueUrl: '__queue_url__',
-                  enqueueUuid: uuid(),
-                  queueType: 'SQS',
-                  requeueDepth: 7,
+              execute(
+                {
+                  task: await promiseTask,
+                  meta: {
+                    queueUrl: '__queue_url__',
+                    enqueueUuid: uuid(),
+                    queueType: 'SQS',
+                    requeueDepth: 7,
+                  },
                 },
-              }),
+                { log: console },
+              ),
             );
             expect(error.message).toContain(
               'attempted to retry a task more than limit times. blocked this attempt to prevent infiloop',
@@ -231,7 +240,6 @@ describe('withAsyncTaskExecutionLifecycleExecute', () => {
         },
         {
           dao: daoAsyncTaskSyncProspects,
-          log: console,
           api: {
             sqs: {
               sendMessage: sqsSendMessageMock,
@@ -254,7 +262,7 @@ describe('withAsyncTaskExecutionLifecycleExecute', () => {
               status: AsyncTaskStatus.QUEUED,
             }),
           });
-          const result = await execute({ task });
+          const result = await execute({ task }, { log: console });
           expect(executeInnerLogicMock).toHaveBeenCalledTimes(1);
           expect(result.task.status).toEqual(AsyncTaskStatus.FULFILLED);
         });
@@ -281,7 +289,7 @@ describe('withAsyncTaskExecutionLifecycleExecute', () => {
                 }),
               });
 
-              const error = await getError(execute({ task }));
+              const error = await getError(execute({ task }, { log: console }));
               expect(error.message).toContain(
                 'this error was thrown to ensure this task is retried later',
               );
@@ -316,7 +324,7 @@ describe('withAsyncTaskExecutionLifecycleExecute', () => {
                 }),
               ),
             });
-            const result = await execute({ task });
+            const result = await execute({ task }, { log: console });
             expect(executeInnerLogicMock).toHaveBeenCalledTimes(1);
             expect(result.task.status).toEqual(AsyncTaskStatus.FULFILLED);
           });

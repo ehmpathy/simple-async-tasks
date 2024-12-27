@@ -47,12 +47,11 @@ describe('withAsyncTaskExecutionLifecycleQueue', () => {
       const enqueue = withAsyncTaskExecutionLifecycleEnqueue({
         getNew: exampleGetNew,
         dao: exampleDao,
-        log: console,
         queue,
       });
 
       then('it should successfully allow enqueue', async () => {
-        const enqueued = await enqueue({});
+        const enqueued = await enqueue({}, { log: console });
         expect(enqueued).toHaveProperty('status');
         expect(enqueued.status).toEqual(AsyncTaskStatus.QUEUED);
       });
@@ -76,12 +75,11 @@ describe('withAsyncTaskExecutionLifecycleQueue', () => {
       const enqueue = withAsyncTaskExecutionLifecycleEnqueue({
         getNew: exampleGetNew,
         dao: exampleDao,
-        log: console,
         queue,
       });
 
       then('it should successfully allow enqueue', async () => {
-        const enqueued = await enqueue({});
+        const enqueued = await enqueue({}, { log: console });
         expect(enqueued).toHaveProperty('status');
         expect(enqueued.status).toEqual(AsyncTaskStatus.QUEUED);
       });

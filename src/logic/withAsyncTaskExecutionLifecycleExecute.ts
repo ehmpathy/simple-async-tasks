@@ -1,7 +1,7 @@
 import { HelpfulError, UnexpectedCodePathError } from '@ehmpathy/error-fns';
 import { HelpfulErrorMetadata } from '@ehmpathy/error-fns/dist/HelpfulError';
 import { addSeconds, isBefore, parseISO } from 'date-fns';
-import type { LogMethods } from 'simple-leveled-log-methods';
+import { VisualogicContext } from 'visualogic';
 
 import {
   AsyncTaskDao,
@@ -48,18 +48,16 @@ export const withAsyncTaskExecutionLifecycleExecute = <
   U extends Partial<T>,
   M extends Partial<T> & { status: AsyncTaskStatus },
   I extends AsyncTaskQueueParcel<T>,
-  C extends AsyncTaskDaoContext,
+  C extends AsyncTaskDaoContext & VisualogicContext,
   O extends Record<string, any>,
 >(
   logic: (input: I & AsyncTaskQueueParcel<T>, context: C) => O | Promise<O>,
   {
     dao,
-    log,
     api,
     options,
   }: {
     dao: AsyncTaskDao<T, U, M, C>;
-    log: LogMethods;
     api?: {
       sqs?: SimpleAwsSqsApi;
     };
@@ -105,7 +103,7 @@ export const withAsyncTaskExecutionLifecycleExecute = <
       {
         // wait 3 seconds before retrying, to attempt to recover from read-after-write out-of-sync issues (e.g., if we tried to search for the task before the db.reader was synced to db.writer)
         delay: { seconds: 3 },
-        log,
+        log: context.log,
       },
     )();
 
@@ -119,10 +117,13 @@ export const withAsyncTaskExecutionLifecycleExecute = <
         const queueUrl = input.meta.queueUrl;
         return async (message: string, metadata: HelpfulErrorMetadata) => {
           // log what we're up to
-          log.debug(`executeTask.progress: requeueing task to retry later`, {
-            message,
-            metadata,
-          });
+          context.log.debug(
+            `executeTask.progress: requeueing task to retry later`,
+            {
+              message,
+              metadata,
+            },
+          );
 
           // get the sqs api
           const sqs =
@@ -199,14 +200,14 @@ export const withAsyncTaskExecutionLifecycleExecute = <
     // check that the task has not already been fulfilled and is not canceled; if either are true, warn and exit
     const emptyResult: Partial<O> = {};
     if (foundTask.status === AsyncTaskStatus.FULFILLED) {
-      log.warn(
+      context.log.warn(
         'executeTask.progress: attempted to execute a task that has already been fulfilled. skipping',
         { task: foundTask },
       );
       return { ...emptyResult, task: foundTask };
     }
     if (foundTask.status === AsyncTaskStatus.CANCELED) {
-      log.warn(
+      context.log.warn(
         'executeTask.progress: attempted to execute a task that has already been canceled. skipping',
         { task: foundTask },
       );
@@ -290,7 +291,7 @@ export const withAsyncTaskExecutionLifecycleExecute = <
       // otherwise, just return the result with the state of the task now, since this is probably a multi-step task
       return { ...result, task: taskNow };
     } catch (error) {
-      log.warn(
+      context.log.warn(
         'executeTask.progress: caught an error from the execution attempt. marking it as failed. will re-emit the error for sqs retry',
         {
           task: attemptedTask,

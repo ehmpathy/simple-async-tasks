@@ -1,6 +1,6 @@
 import { UnexpectedCodePathError } from '@ehmpathy/error-fns';
-import type { LogMethods } from 'simple-leveled-log-methods';
 import { HasMetadata, isAFunction } from 'type-fns';
+import { VisualogicContext } from 'visualogic';
 
 import { uuid } from '../deps';
 import {
@@ -96,17 +96,15 @@ export const withAsyncTaskExecutionLifecycleEnqueue = <
   T extends AsyncTask,
   U extends Partial<T>,
   M extends Partial<T> & { status: AsyncTaskStatus },
-  C extends AsyncTaskDaoContext,
+  C extends AsyncTaskDaoContext & VisualogicContext,
   I extends U,
 >({
   getNew,
   dao,
-  log,
   queue,
 }: {
   getNew: (input: I, context: C) => T | Promise<T>;
   dao: AsyncTaskDao<T, U, M, C>;
-  log: LogMethods;
   queue: SimpleAsyncTaskSqsQueueContract | SimpleAsyncTaskAnyQueueContract<T>;
 }) => {
   return async (input: I, context: C): Promise<HasMetadata<T>> => {
@@ -120,7 +118,7 @@ export const withAsyncTaskExecutionLifecycleEnqueue = <
 
     // if the task already exists, check that its in a queueable state
     if (taskFound?.status === AsyncTaskStatus.QUEUED) {
-      log.debug(
+      context.log.debug(
         'enqueueTask.progress: skipped adding task to queue. reason: task is already queued',
         {
           task: taskFound,
@@ -129,7 +127,7 @@ export const withAsyncTaskExecutionLifecycleEnqueue = <
       return taskFound; // if already queued, no need to duplicate the request
     }
     if (taskFound?.status === AsyncTaskStatus.ATTEMPTED) {
-      log.debug(
+      context.log.debug(
         'enqueueTask.progress: skipped adding task to queue. reason: task is already being attempted from queue',
         {
           task: taskFound,
@@ -138,7 +136,7 @@ export const withAsyncTaskExecutionLifecycleEnqueue = <
       return taskFound; // if already being attempted, no need to duplicate the request
     }
     if (taskFound?.status === AsyncTaskStatus.FULFILLED) {
-      log.debug(
+      context.log.debug(
         'enqueueTask.progress: skipped adding task to queue. reason: task was already fulfilled',
         {
           task: taskFound,
@@ -147,7 +145,7 @@ export const withAsyncTaskExecutionLifecycleEnqueue = <
       return taskFound; // if already fulfilled, no sense in trying it again
     }
     if (taskFound?.status === AsyncTaskStatus.CANCELED) {
-      log.debug(
+      context.log.debug(
         'enqueueTask.progress: skipped adding task to queue. reason: task was already canceled',
         {
           task: taskFound,
@@ -164,7 +162,7 @@ export const withAsyncTaskExecutionLifecycleEnqueue = <
       ...taskReadyToQueue,
       status: AsyncTaskStatus.QUEUED,
     };
-    log.debug('enqueueTask.progress: adding task to queue', {
+    context.log.debug('enqueueTask.progress: adding task to queue', {
       task: taskToQueue,
       queue: { type: queue.type },
     });
@@ -196,7 +194,7 @@ export const withAsyncTaskExecutionLifecycleEnqueue = <
         { queue },
       );
     })();
-    log.debug('enqueueTask.progress: added task to queue', {
+    context.log.debug('enqueueTask.progress: added task to queue', {
       task: taskToQueue,
       queue: { type: queue.type },
     });

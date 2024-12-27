@@ -1,5 +1,5 @@
 import { UniDuration, sleep } from '@ehmpathy/uni-time';
-import type { LogMethods } from 'simple-leveled-log-methods';
+import { VisualogicContext } from 'visualogic';
 
 /**
  * function which calls the wrapped function and runs it again one time if an error is caught
@@ -8,8 +8,7 @@ export const withRetry = <T extends (...args: any[]) => Promise<any>>(
   logic: T,
   options?: {
     delay?: UniDuration;
-    log?: LogMethods;
-  },
+  } & VisualogicContext,
 ): T => {
   return (async (...args: Parameters<T>): Promise<ReturnType<T>> => {
     try {
