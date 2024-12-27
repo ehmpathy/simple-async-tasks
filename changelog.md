@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/ehmpathy/simple-async-tasks/compare/v1.8.0...v1.9.0) (2024-12-27)
+
+
+### Features
+
+* **context:** upgrade to grab logger from context ([f3b1e30](https://github.com/ehmpathy/simple-async-tasks/commit/f3b1e30f6dfa5732a84df64979d29351553951cb))
+
 ## [1.8.0](https://github.com/ehmpathy/simple-async-tasks/compare/v1.7.2...v1.8.0) (2024-08-19)
 
 
